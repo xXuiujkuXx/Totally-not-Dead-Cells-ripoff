@@ -149,7 +149,7 @@ public class CharacterAnimation extends JPanel {
     }
 
     private void movePlayer() {
-        if (!pressedKeys.isEmpty() && !isAttack1 && !isAttack2 && !isAttack3) {
+        if (!pressedKeys.isEmpty() && !isAttack1 && !isAttack2 && !isAttack3) {  // Ignore movement if attacking
             if (pressedKeys.contains(KeyEvent.VK_W)) playerY -= speed;
             if (pressedKeys.contains(KeyEvent.VK_S)) playerY += speed;
             if (pressedKeys.contains(KeyEvent.VK_A)) {
@@ -166,21 +166,22 @@ public class CharacterAnimation extends JPanel {
         }
     }
 
-
     private void updateMovementState() {
-        if (!pressedKeys.isEmpty()) {
-            if (resetFrame && !isAttack1) {
-                curFrame = 0;
-                resetFrame = false;
-            }
-            moving = true;
-            animationTimer.setDelay(80);
-        } else {
-            moving = false;
-            if (!isAttack1) {
+        if (!isAttack1 && !isAttack2 && !isAttack3) {
+            if (!pressedKeys.isEmpty()) {
+                if (resetFrame) {
+                    curFrame = 0;
+                    resetFrame = false;
+                }
+                moving = true;
+                animationTimer.setDelay(80);
+            } else {
+                moving = false;
                 animationTimer.setDelay(150);
                 resetFrame = true;
             }
+        } else {
+            moving = false;
         }
     }
 
