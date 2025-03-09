@@ -28,32 +28,47 @@ public class CharacterAnimation extends JPanel {
     private boolean queueAttack3 = false;
     private boolean isAttack3 = false;
     private int playerX = 100;
-    private int playerY = 100;
+    private int playerY = 250;
+    private int drawWidth = 200;
+    private int drawHeight = 200;
     private final int speed = 5;
     private Set<Integer> pressedKeys = new HashSet<>();
     private Timer animationTimer, movementTimer;
     private boolean resetFrame = true;
+    private Map map;
+    private Rectangle hitbox;
+    // how tf do i extends 2 class
+    private int tileSize = 32;
+    private int mapWidth = 24;
+    private int mapHeight = 19;
+    // gravity here
+    private boolean isJumping = false;
+    private boolean isOnGround = false;
+    private double velocityY = 0.0;
+    private final double gravity = 0.6;
+    private final double jumpStrength = -12;
+    private final int floatOffset = tileSize / 2;
+    public CharacterAnimation(Map map) {
+        this.map = map;
 
-    public CharacterAnimation() {
         loadAnimation();
-
         animationTimer = new Timer(150, e -> nextFrame());
         animationTimer.start();
 
-        movementTimer = new Timer(0, e -> movePlayer());
+        movementTimer = new Timer(10, e -> movePlayer());
         movementTimer.start();
 
         addKeyListener(new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
                 pressedKeys.add(e.getKeyCode());
-                updateMovementState();
+                updateTime();
             }
 
             @Override
             public void keyReleased(KeyEvent e) {
                 pressedKeys.remove(e.getKeyCode());
-                updateMovementState();
+                updateTime();
             }
         });
 
@@ -61,11 +76,9 @@ public class CharacterAnimation extends JPanel {
             @Override
             public void mousePressed(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e)) {
-                    if (isAttack2) {  
-                        queueAttack3 = true;
-                    } else if (isAttack1) {  
-                        queueAttack2 = true;
-                    } else if (!isAttack1 && !isAttack2 && !isAttack3) {  
+                    if (isAttack2) queueAttack3 = true;
+                    else if (isAttack1) queueAttack2 = true;
+                    else if (!isAttack1 && !isAttack2 && !isAttack3) {
                         isAttack1 = true;
                         curFrame = 0;
                         animationTimer.setDelay(80);
@@ -73,10 +86,42 @@ public class CharacterAnimation extends JPanel {
                 }
             }
         });
-
+        createHitbox();
         setFocusable(true);
     }
+    public void createHitbox() {
+        hitbox = new Rectangle((int) playerX, (int) playerY, drawWidth, drawHeight);
+    }
+    public void updateHitbox() {
+        int newX = playerX;
+        int newY = playerY + 80;
+        int[][] tileMap = map.getTileMap();
+        int leftTile = newX / 32;
+        int rightTile = (newX + hitbox.width - 102) / 32; // -102 is there for a reason, trust me. dont change it
+        int topTile = newY / 32;
+        int bottomTile = (newY + hitbox.height) / 32;
 
+        if (leftTile < 0) leftTile = 0;
+        if (rightTile >= 24) rightTile = 23; // both of these have to come from map scale, if only i know how to extend 2 class
+        if (topTile < 0) topTile = 0;
+        if (bottomTile >= 19) bottomTile = 18;
+
+        boolean collision = (tileMap[topTile][leftTile] != -1) ||
+                            (tileMap[topTile][rightTile] != -1) ||
+                            (tileMap[bottomTile][leftTile] != -1) ||
+                            (tileMap[bottomTile][rightTile] != -1);
+        if (!collision) {
+            hitbox.x = newX;
+            hitbox.y = newY;
+        } else {
+            playerX = hitbox.x;
+            playerY = hitbox.y - 80;
+        }
+    }
+
+    public Rectangle getHitbox() {
+        return hitbox;
+    }
     private void loadAnimation() {
         try {
             spriteSheet = ImageIO.read(getClass().getResourceAsStream("/imag/knight.png"));
@@ -149,24 +194,77 @@ public class CharacterAnimation extends JPanel {
     }
 
     private void movePlayer() {
-        if (!pressedKeys.isEmpty() && !isAttack1 && !isAttack2 && !isAttack3) {  // Ignore movement if attacking
-            if (pressedKeys.contains(KeyEvent.VK_W)) playerY -= speed;
-            if (pressedKeys.contains(KeyEvent.VK_S)) playerY += speed;
+        if (!pressedKeys.isEmpty() && !isAttack1 && !isAttack2 && !isAttack3) {
+            int newX = playerX;
             if (pressedKeys.contains(KeyEvent.VK_A)) {
-                playerX -= speed;
+                newX -= speed;
                 faceLeft = true;
                 faceRight = false;
             }
             if (pressedKeys.contains(KeyEvent.VK_D)) {
-                playerX += speed;
+                newX += speed;
                 faceLeft = false;
                 faceRight = true;
             }
-            repaint();
+            if (!checkHorizontalCollision(newX)) {
+                playerX = newX;
+                hitbox.x = newX;
+            }
+
+            if (pressedKeys.contains(KeyEvent.VK_W) && isOnGround) {
+                isJumping = true;
+                isOnGround = false;
+                velocityY = jumpStrength; // Using the double value for jump strength
+            }
+        }
+        applyGravity();
+        playerY = hitbox.y - 80; // Adjust sprite position based on hitbox
+        repaint();
+    }
+    
+    private boolean checkHorizontalCollision(int newX) {
+        int[][] tileMap = map.getTileMap();
+        int leftTile = newX / tileSize;
+        int rightTile = (newX + drawWidth - 102) / tileSize;
+        int topTile = hitbox.y / tileSize;
+        int bottomTile = (hitbox.y + hitbox.height) / tileSize;
+
+        if (leftTile < 0) leftTile = 0;
+        if (rightTile >= mapWidth) rightTile = mapWidth - 1;
+        if (topTile < 0) topTile = 0;
+        if (bottomTile >= mapHeight) bottomTile = mapHeight - 1;
+
+        return (tileMap[topTile][leftTile] != -1 || tileMap[bottomTile][leftTile] != -1 ||
+                tileMap[topTile][rightTile] != -1 || tileMap[bottomTile][rightTile] != -1);
+    }
+    
+    private void applyGravity() {
+        if (!isOnGround) {
+            velocityY += gravity;
+        }
+        double newHitboxY = hitbox.y + velocityY;
+        int[][] tileMap = map.getTileMap();
+        int leftTile = playerX / tileSize;
+        int rightTile = (playerX + drawWidth - 102) / tileSize;
+        int bottomTile = (int) ((newHitboxY + hitbox.height) / tileSize);
+
+        if (leftTile < 0) leftTile = 0;
+        if (rightTile >= mapWidth) rightTile = mapWidth - 1;
+        if (bottomTile >= mapHeight) bottomTile = mapHeight - 1;
+
+        boolean checkGround = (tileMap[bottomTile][leftTile] != -1) || (tileMap[bottomTile][rightTile] != -1);
+        if (checkGround) {
+            hitbox.y = (bottomTile * tileSize) - hitbox.height - 1;
+            isOnGround = true;
+            isJumping = false;
+            velocityY = 0.0; 
+        } else {
+            hitbox.y = (int) newHitboxY;
+            isOnGround = false;
         }
     }
 
-    private void updateMovementState() {
+    private void updateTime() {
         if (!isAttack1 && !isAttack2 && !isAttack3) {
             if (!pressedKeys.isEmpty()) {
                 if (resetFrame) {
@@ -189,8 +287,8 @@ public class CharacterAnimation extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        g.setColor(Color.BLACK);
-
+        
+        map.paintComponent(g);
         BufferedImage currentFrame;
         if (isAttack1) {
             currentFrame = animations[3][curFrame];
@@ -205,7 +303,7 @@ public class CharacterAnimation extends JPanel {
         }
 
         int drawX = playerX;
-        int drawWidth = 200;
+        drawWidth = 200;
 
         if ((isAttack1 || isAttack2 || isAttack3) && !moving) {
             drawX -= 50;
@@ -232,20 +330,15 @@ public class CharacterAnimation extends JPanel {
         }
 
         if (faceLeft) {
-            g.drawImage(currentFrame, drawX + 100, playerY, -drawWidth, 200, null);
+            g.drawImage(currentFrame, drawX + 100, playerY, -drawWidth, drawHeight, null);
+            updateHitbox();
+            g.setColor(Color.PINK);
+            g.drawRect(hitbox.x, hitbox.y, hitbox.width-100, hitbox.height-80);
         } else {
-            g.drawImage(currentFrame, drawX, playerY, drawWidth, 200, null);
+            g.drawImage(currentFrame, drawX, playerY, drawWidth, drawHeight, null);
+            updateHitbox();
+            g.setColor(Color.PINK);
+            g.drawRect(hitbox.x, hitbox.y, hitbox.width-100, hitbox.height-80);  
         }
-    }
-
-
-
-    public static void main(String[] args) {
-        JFrame frame = new JFrame("Sprite Animation");
-        CharacterAnimation panel = new CharacterAnimation();
-        frame.add(panel);
-        frame.setSize(800, 600);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setVisible(true);
     }
 }
