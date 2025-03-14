@@ -308,14 +308,14 @@ public class CharacterAnimation extends JPanel {
         BufferedImage currentFrame;
         if (isJumping) {
             currentFrame = animations[8][curFrame];
+        } else if (isAttack1) {
+            currentFrame = animations[3][curFrame];    
         } else if (isAttack2) {
             currentFrame = animations[4][curFrame];
         } else if (isAttack3) {
             currentFrame = animations[5][curFrame];   
         } else if (moving) {
             currentFrame = animations[1][curFrame];
-        } else if (isAttack1) {
-            currentFrame = animations[3][curFrame];
         } else {
             currentFrame = knightIdle[curFrame];
         }
@@ -331,7 +331,7 @@ public class CharacterAnimation extends JPanel {
         if (faceLeft && moving) {
             drawX += 100;
         }
-
+        
         if ((isAttack1 || isAttack2 || isAttack3 || isJumping) && !moving && faceLeft) {
             drawX += 100;
         }
